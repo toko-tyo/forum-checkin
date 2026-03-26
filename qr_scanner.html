@@ -2,62 +2,136 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>出席チェック</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #fff; min-height: 100vh; }
-  .header { background: #16213e; padding: 16px; text-align: center; }
+
+  .header {
+    background: #16213e;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   .header h1 { font-size: 20px; }
-  .header a { color: #4fc3f7; font-size: 14px; display: block; margin-top: 6px; }
+  .counter {
+    background: rgba(255,255,255,.15);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 15px;
+    font-weight: bold;
+  }
 
-  #vc { position: relative; width: 100%; max-width: 400px; margin: 20px auto; }
-  video { width: 100%; border-radius: 12px; display: block; }
+  /* カメラエリア */
+  #vc {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    margin: 20px auto 0;
+  }
+  video {
+    width: 100%;
+    border-radius: 12px;
+    display: block;
+    background: #000;
+  }
   .overlay {
-    position: absolute; top: 50%; left: 50%;
+    position: absolute;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 200px; height: 200px;
-    border: 3px solid #4fc3f7; border-radius: 12px;
+    width: 220px; height: 220px;
+    border: 3px solid #4fc3f7;
+    border-radius: 12px;
     display: none;
+    pointer-events: none;
   }
+  .overlay::before, .overlay::after {
+    content: '';
+    position: absolute;
+    width: 30px; height: 30px;
+    border-color: #fff;
+    border-style: solid;
+  }
+  .overlay::before { top: -3px; left: -3px; border-width: 3px 0 0 3px; }
+  .overlay::after  { bottom: -3px; right: -3px; border-width: 0 3px 3px 0; }
 
-  #startWrap { text-align: center; margin: 24px 16px; }
+  /* ボタン */
+  #startWrap { text-align: center; padding: 24px 16px; }
   #startBtn {
-    background: #4fc3f7; color: #000; border: none; border-radius: 12px;
-    padding: 18px 40px; font-size: 20px; font-weight: bold;
-    cursor: pointer; width: 100%; max-width: 400px;
+    background: #4fc3f7; color: #000;
+    border: none; border-radius: 12px;
+    padding: 18px 0; font-size: 20px; font-weight: bold;
+    cursor: pointer; width: 100%; max-width: 560px;
+    transition: background .2s;
   }
-  #startBtn:disabled { background: #888; }
+  #startBtn:hover { background: #81d4fa; }
+  #startBtn:disabled { background: #555; color: #999; cursor: not-allowed; }
 
+  /* 結果表示 */
   #result {
-    max-width: 400px; margin: 16px auto; padding: 20px;
-    border-radius: 12px; text-align: center;
-    font-size: 22px; font-weight: bold; display: none;
+    max-width: 560px; margin: 16px auto;
+    padding: 20px 24px; border-radius: 12px;
+    text-align: center; font-size: 24px; font-weight: bold;
+    display: none;
+    transition: opacity .3s;
   }
   .ok       { background: #1b5e20; border: 2px solid #4caf50; }
   .already  { background: #e65100; border: 2px solid #ff9800; }
   .notfound { background: #b71c1c; border: 2px solid #f44336; }
-  .sub { font-size: 15px; margin-top: 8px; font-weight: normal; opacity: .85; }
+  .sub { font-size: 16px; margin-top: 8px; font-weight: normal; opacity: .9; }
 
+  /* 統計 */
   .stats {
-    max-width: 400px; margin: 16px auto;
-    background: #16213e; padding: 16px;
+    max-width: 560px; margin: 16px auto;
+    background: #16213e; padding: 20px;
     border-radius: 12px; text-align: center;
   }
-  .big-num { font-size: 48px; font-weight: bold; color: #4fc3f7; }
+  .big-num { font-size: 56px; font-weight: bold; color: #4fc3f7; line-height: 1; }
+  .stats-label { font-size: 16px; margin-top: 6px; opacity: .8; }
 
-  #listArea { max-width: 400px; margin: 0 auto 24px; display: none; }
-  #listArea h2 { font-size: 16px; margin-bottom: 8px; color: #4fc3f7; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { background: #16213e; padding: 8px; text-align: left; }
-  td { padding: 8px; border-bottom: 1px solid #333; }
-  #toggleList { color: #4fc3f7; font-size: 13px; background: none; border: none; cursor: pointer; margin-top: 8px; }
+
+  /* エラーバナー */
+  #errBanner {
+    max-width: 560px; margin: 16px auto;
+    background: #b71c1c; border-radius: 8px;
+    padding: 12px 16px; font-size: 14px;
+    display: none;
+  }
 </style>
 </head>
 <body>
 
+<!-- ========== パスワード認証画面 ========== -->
+<div id="authScreen" style="
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:#1a1a2e; display:flex; align-items:center;
+  justify-content:center; z-index:9999;">
+  <div style="background:#16213e; border-radius:16px; padding:40px 32px;
+    width:90%; max-width:360px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,.5);">
+    <div style="font-size:40px; margin-bottom:8px;">&#128274;</div>
+    <h2 style="color:#fff; font-size:20px; margin-bottom:6px;">出席チェック</h2>
+    <p style="color:#aaa; font-size:14px; margin-bottom:24px;">2026ACP-LLPフォーラム 事務局専用</p>
+    <input id="pwInput" type="password" placeholder="パスワードを入力"
+      style="width:100%; padding:14px 16px; font-size:16px; border-radius:8px;
+      border:2px solid #4fc3f7; background:#1a1a2e; color:#fff;
+      outline:none; margin-bottom:12px; letter-spacing:2px;"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <button onclick="checkPw()" style="width:100%; padding:14px; background:#4fc3f7;
+      color:#000; border:none; border-radius:8px; font-size:16px;
+      font-weight:bold; cursor:pointer;">入室する</button>
+    <p id="pwErr" style="color:#f44336; font-size:13px; margin-top:12px; display:none;">
+      パスワードが違います
+    </p>
+  </div>
+</div>
+<!-- ========================================= -->
+
+<div id="mainContent" style="display:none;">
 <div class="header">
   <h1>📷 出席チェック</h1>
+  <div class="counter" id="counter">- / - 名</div>
 </div>
 
 <div id="vc">
@@ -69,155 +143,221 @@
   <button id="startBtn" onclick="startCamera()">📷 カメラを起動する</button>
 </div>
 
+<div id="errBanner"></div>
 <div id="result"></div>
 
 <div class="stats">
   <div class="big-num" id="count">-</div>
-  <div>名 出席済み</div>
-  <button id="toggleList" onclick="toggleList()">▼ 出席者一覧を表示</button>
+  <div class="stats-label">名 出席済み</div>
 </div>
-
-<div id="listArea">
-  <h2>📋 出席者一覧</h2>
-  <table>
-    <thead><tr><th>時刻</th><th>氏名</th><th>所属</th></tr></thead>
-    <tbody id="listBody"></tbody>
-  </table>
-</div>
-
-<!-- GASのWebアプリURL：ここに実際のURLが入ります -->
-<script>
-  // ★ GAS WebアプリのURL
-  var GAS_URL = "https://script.google.com/macros/s/AKfycbwsZxZy4EjcsXCprIeixnEqSS8im_7ZdsF56s7VNcHTQkuGUBOj-bHq_Jm4ZJbQRHfX/exec";
-
-  var video   = document.getElementById("video");
-  var result  = document.getElementById("result");
-  var countEl = document.getElementById("count");
-  var scanning = false, lastId = "";
-
-  // ---------- カメラ起動 ----------
-  function startCamera() {
-    var btn = document.getElementById("startBtn");
-    btn.textContent = "起動中...";
-    btn.disabled = true;
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(function(stream) {
-        video.srcObject = stream;
-        document.getElementById("startWrap").style.display = "none";
-        document.getElementById("overlay").style.display = "block";
-        scanning = true;
-        startScan();
-        updateCount();
-      })
-      .catch(function(err) {
-        btn.textContent = "📷 カメラを起動する";
-        btn.disabled = false;
-        alert("カメラを起動できませんでした。\nブラウザの設定でカメラを許可してからもう一度タップしてください。\n\nエラー: " + err.message);
-      });
-  }
-
-  // ---------- QRスキャンループ ----------
-  function startScan() {
-    var canvas = document.createElement("canvas");
-    var ctx    = canvas.getContext("2d");
-    (function loop() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        canvas.width  = video.videoWidth;
-        canvas.height = video.videoHeight;
-        ctx.drawImage(video, 0, 0);
-        var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        var code    = jsQR(imgData.data, imgData.width, imgData.height);
-        if (code && scanning && code.data !== lastId) {
-          lastId   = code.data;
-          scanning = false;
-          doCheckIn(code.data);
-        }
-      }
-      requestAnimationFrame(loop);
-    })();
-  }
-
-  // ---------- チェックイン ----------
-  function doCheckIn(id) {
-    fetch(GAS_URL + "?action=checkin&id=" + encodeURIComponent(id))
-      .then(function(r) { return r.json(); })
-      .then(function(r) {
-        showResult(r);
-        updateCount();
-        setTimeout(function() {
-          scanning = true;
-          lastId   = "";
-          result.style.display = "none";
-        }, 4000);
-      })
-      .catch(function(e) {
-        showError("通信エラー: " + e.message);
-      });
-  }
-
-  // ---------- 結果表示 ----------
-  function showResult(r) {
-    result.style.display = "block";
-    if (r.status === "ok") {
-      result.className = "ok";
-      result.innerHTML = "✅ " + r.name + " 様"
-        + "<div class='sub'>" + (r.affiliation || "") + "<br>チェックイン完了！</div>";
-    } else if (r.status === "already") {
-      result.className = "already";
-      result.innerHTML = "⚠️ " + r.name + " 様"
-        + "<div class='sub'>すでにチェックイン済みです</div>";
-    } else {
-      result.className = "notfound";
-      result.innerHTML = "❌ 登録が見つかりません"
-        + "<div class='sub'>QRコードを確認してください</div>";
-    }
-  }
-
-  function showError(msg) {
-    result.style.display = "block";
-    result.className = "notfound";
-    result.innerHTML = "❌ " + msg;
-    setTimeout(function() {
-      scanning = true; lastId = ""; result.style.display = "none";
-    }, 4000);
-  }
-
-  // ---------- 出席カウント更新 ----------
-  function updateCount() {
-    fetch(GAS_URL + "?action=stats")
-      .then(function(r) { return r.json(); })
-      .then(function(r) {
-        countEl.textContent = r.attended + " / " + r.total;
-        // 一覧更新
-        var tbody = document.getElementById("listBody");
-        tbody.innerHTML = "";
-        (r.attendees || []).forEach(function(a) {
-          var tr = document.createElement("tr");
-          tr.innerHTML = "<td>" + a.time + "</td><td>" + a.name + "</td><td>" + (a.affiliation || "") + "</td>";
-          tbody.appendChild(tr);
-        });
-      })
-      .catch(function() {});
-  }
-
-  // ---------- 一覧の開閉 ----------
-  function toggleList() {
-    var area = document.getElementById("listArea");
-    var btn  = document.getElementById("toggleList");
-    if (area.style.display === "none") {
-      area.style.display = "block";
-      btn.textContent = "▲ 出席者一覧を隠す";
-      updateCount();
-    } else {
-      area.style.display = "none";
-      btn.textContent = "▼ 出席者一覧を表示";
-    }
-  }
-
-  setInterval(updateCount, 30000);
-</script>
 
 <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+// ============================================================
+// ★ここを自分のGAS WebアプリURLに変更してください★
+// ============================================================
+var GAS_URL = "https://script.google.com/macros/s/AKfycbwsZxZy4EjcsXCprIeixnEqSS8im_7ZdsF56s7VNcHTQkuGUBOj-bHq_Jm4ZJbQRHfX/exec";
+// ============================================================
+
+var video    = document.getElementById("video");
+var result   = document.getElementById("result");
+var countEl  = document.getElementById("count");
+var scanning = false;
+var lastId   = "";
+var lastScan = 0; // 連続読み取り防止
+
+// ---------- カメラ起動 ----------
+function startCamera() {
+  var btn = document.getElementById("startBtn");
+  btn.textContent = "起動中...";
+  btn.disabled = true;
+
+  navigator.mediaDevices.getUserMedia({
+    video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+  })
+  .then(function(stream) {
+    video.srcObject = stream;
+    document.getElementById("startWrap").style.display = "none";
+    document.getElementById("overlay").style.display = "block";
+    scanning = true;
+    startScan();
+    updateStats();
+  })
+  .catch(function(err) {
+    btn.textContent = "📷 カメラを起動する";
+    btn.disabled = false;
+    showErr("カメラを起動できませんでした: " + err.message);
+  });
+}
+
+// ---------- QRスキャンループ ----------
+function startScan() {
+  var canvas = document.createElement("canvas");
+  var ctx    = canvas.getContext("2d");
+
+  (function loop() {
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      var code    = jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: "dontInvert"
+      });
+
+      var now = Date.now();
+      if (code && scanning && code.data !== lastId && (now - lastScan) > 2000) {
+        lastId   = code.data;
+        lastScan = now;
+        scanning = false;
+        doCheckIn(code.data);
+      }
+    }
+    requestAnimationFrame(loop);
+  })();
+}
+
+// ---------- JSONP呼び出し（CORSを回避）----------
+var _cbCount = 0;
+function callGas(params, onSuccess, onError) {
+  var cbName = "_gasCb" + (++_cbCount);
+  var url = GAS_URL + "?" + params + "&callback=" + cbName;
+  var script = document.createElement("script");
+  var timer = setTimeout(function() {
+    delete window[cbName];
+    document.body.removeChild(script);
+    if (onError) onError("タイムアウト");
+  }, 10000);
+  window[cbName] = function(data) {
+    clearTimeout(timer);
+    delete window[cbName];
+    document.body.removeChild(script);
+    onSuccess(data);
+  };
+  script.src = url;
+  script.onerror = function() {
+    clearTimeout(timer);
+    delete window[cbName];
+    document.body.removeChild(script);
+    if (onError) onError("通信エラー");
+  };
+  document.body.appendChild(script);
+}
+
+// ---------- チェックイン ----------
+function doCheckIn(id) {
+  callGas(
+    "action=checkin&id=" + encodeURIComponent(id),
+    function(r) {
+      showResult(r);
+      updateStats();
+      setTimeout(function() {
+        scanning = true;
+        lastId   = "";
+        result.style.display = "none";
+      }, 3000);
+    },
+    function(err) {
+      showErr("通信エラー: " + err);
+      setTimeout(function() { scanning = true; lastId = ""; }, 3000);
+    }
+  );
+}
+
+// ---------- 結果表示 ----------
+function showResult(r) {
+  result.style.display = "block";
+  if (r.status === "ok") {
+    result.className = "ok";
+    result.innerHTML = "✅ " + r.name + " 様"
+      + "<div class='sub'>" + (r.affiliation || "") + "<br>チェックイン完了！</div>";
+  } else if (r.status === "already") {
+    result.className = "already";
+    result.innerHTML = "⚠️ " + r.name + " 様"
+      + "<div class='sub'>すでにチェックイン済みです</div>";
+  } else {
+    result.className = "notfound";
+    result.innerHTML = "❌ 登録が見つかりません"
+      + "<div class='sub'>QRコードを確認してください</div>";
+  }
+}
+
+// ---------- エラー表示 ----------
+function showErr(msg) {
+  var b = document.getElementById("errBanner");
+  b.textContent = "⚠ " + msg;
+  b.style.display = "block";
+  setTimeout(function() { b.style.display = "none"; }, 5000);
+}
+
+// ---------- 統計更新 ----------
+function updateStats() {
+  callGas(
+    "action=stats",
+    function(r) {
+      countEl.textContent = r.attended + " / " + r.total;
+    },
+    function() {}
+  );
+}
+
+
+
+// 30秒ごとに自動更新（認証後のみ動作）
+setInterval(function() {
+  if (document.getElementById("mainScreen").style.display !== "none") updateStats();
+}, 30000);
+</script>
+</div><!-- end mainContent -->
+
+<script>
+// ★ パスワードをここで設定してください ★
+var PASS = "acp2026";
+
+// セッション中は認証済みを保持
+if (sessionStorage.getItem('auth') === '1') {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainContent').style.display = 'block';
+}
+
+function checkPw() {
+  var input = document.getElementById('pwInput').value;
+  if (input === PASS) {
+    sessionStorage.setItem('auth', '1');
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+  } else {
+    document.getElementById('pwErr').style.display = 'block';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+    setTimeout(function(){ document.getElementById('pwErr').style.display='none'; }, 3000);
+  }
+}
+</script>
+</div><!-- /mainScreen -->
+
+<script>
+// ★ パスワードをここで設定してください ★
+var SCANNER_PASSWORD = "forum2026";
+
+function checkPw() {
+  var input = document.getElementById("pwInput").value;
+  if (input === SCANNER_PASSWORD) {
+    document.getElementById("pwScreen").style.display = "none";
+    document.getElementById("mainScreen").style.display = "block";
+    updateStats();
+  } else {
+    document.getElementById("pwErr").style.display = "block";
+    document.getElementById("pwInput").value = "";
+    document.getElementById("pwInput").focus();
+  }
+}
+
+// ページ読み込み時にパスワード入力欄にフォーカス
+window.addEventListener("load", function() {
+  document.getElementById("pwInput").focus();
+});
+</script>
+
 </body>
 </html>
