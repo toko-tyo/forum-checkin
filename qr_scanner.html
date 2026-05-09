@@ -6,7 +6,12 @@
 <title>出席チェック</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, sans-serif; background: #1a1a2e; color: #fff; min-height: 100vh; }
+  body {
+    font-family: -apple-system, sans-serif;
+    background: #1a1a2e; color: #fff;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+  }
 
   /* パスワード画面 */
   #authScreen {
@@ -32,58 +37,86 @@
     border: none; border-radius: 8px; font-size: 16px;
     font-weight: bold; cursor: pointer;
   }
-  #pwErr {
-    color: #f44336; font-size: 13px;
-    margin-top: 12px; display: none;
-  }
+  #pwErr { color: #f44336; font-size: 13px; margin-top: 12px; display: none; }
 
   /* メイン画面 */
-  #mainScreen { display: none; }
+  #mainScreen { display: none; flex-direction: column; height: 100vh; }
+
+  /* ヘッダー */
   .header {
-    background: #16213e; padding: 16px 20px;
+    background: #16213e; padding: 10px 16px;
     display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
   }
-  .header h1 { font-size: 20px; }
+  .header h1 { font-size: 17px; }
   .counter {
     background: rgba(255,255,255,.15); border-radius: 20px;
-    padding: 6px 16px; font-size: 15px; font-weight: bold;
+    padding: 4px 14px; font-size: 15px; font-weight: bold;
   }
-  #vc { position: relative; width: 100%; max-width: 560px; margin: 20px auto 0; }
-  video { width: 100%; border-radius: 12px; display: block; background: #000; }
+
+  /* カメラエリア：画面の上半分に収める */
+  #vc {
+    position: relative;
+    width: 100%;
+    flex-shrink: 0;
+    max-height: 45vh;
+    overflow: hidden;
+  }
+  video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block; background: #000;
+  }
   .overlay {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 220px; height: 220px;
+    width: 160px; height: 160px;
     border: 3px solid #4fc3f7; border-radius: 12px;
-    display: none; pointer-events: none;
+    pointer-events: none;
   }
-  #startWrap { text-align: center; padding: 24px 16px; }
+
+  /* 起動ボタンエリア */
+  #startWrap {
+    flex-shrink: 0;
+    padding: 12px 16px;
+  }
   #startBtn {
     background: #4fc3f7; color: #000; border: none;
-    border-radius: 12px; padding: 18px 0; font-size: 20px;
-    font-weight: bold; cursor: pointer; width: 100%; max-width: 560px;
+    border-radius: 10px; padding: 14px 0; font-size: 18px;
+    font-weight: bold; cursor: pointer; width: 100%;
   }
   #startBtn:disabled { background: #555; color: #999; cursor: not-allowed; }
+
+  /* エラーバナー */
   #errBanner {
-    max-width: 560px; margin: 16px auto; background: #b71c1c;
-    border-radius: 8px; padding: 12px 16px; font-size: 14px; display: none;
+    flex-shrink: 0;
+    margin: 8px 16px; background: #b71c1c;
+    border-radius: 8px; padding: 10px 14px;
+    font-size: 14px; display: none;
   }
+
+  /* 結果表示 */
   #result {
-    max-width: 560px; margin: 16px auto; padding: 20px 24px;
+    flex-shrink: 0;
+    margin: 8px 16px; padding: 16px;
     border-radius: 12px; text-align: center;
-    font-size: 24px; font-weight: bold; display: none;
+    font-size: 20px; font-weight: bold; display: none;
+    line-height: 1.4;
   }
   .ok       { background: #1b5e20; border: 2px solid #4caf50; }
   .already  { background: #e65100; border: 2px solid #ff9800; }
   .notfound { background: #b71c1c; border: 2px solid #f44336; }
-  .sub { font-size: 16px; margin-top: 8px; font-weight: normal; opacity: .9; }
+  .sub { font-size: 15px; margin-top: 6px; font-weight: normal; opacity: .9; }
+
+  /* 統計 */
   .stats {
-    max-width: 560px; margin: 16px auto;
-    background: #16213e; padding: 20px;
+    flex-shrink: 0;
+    margin: 8px 16px;
+    background: #16213e; padding: 14px;
     border-radius: 12px; text-align: center;
   }
-  .big-num { font-size: 56px; font-weight: bold; color: #4fc3f7; line-height: 1; }
-  .stats-label { font-size: 16px; margin-top: 6px; opacity: .8; }
+  .big-num { font-size: 44px; font-weight: bold; color: #4fc3f7; line-height: 1; }
+  .stats-label { font-size: 14px; margin-top: 4px; opacity: .8; }
 </style>
 </head>
 <body>
@@ -110,7 +143,7 @@
 
   <div id="vc">
     <video id="video" autoplay playsinline muted></video>
-    <div class="overlay" id="overlay"></div>
+    <div class="overlay" id="overlay" style="display:none;"></div>
   </div>
 
   <div id="startWrap">
@@ -129,20 +162,20 @@
 <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 // ============================================================
-// ★ GAS WebアプリURL（変更不要）
+// ★ GAS WebアプリURL
 // ============================================================
 var GAS_URL = "https://script.google.com/macros/s/AKfycbwsZxZy4EjcsXCprIeixnEqSS8im_7ZdsF56s7VNcHTQkuGUBOj-bHq_Jm4ZJbQRHfX/exec";
 
-// ★ パスワード（変更する場合はここを書き換え）
+// ★ パスワード
 var SCANNER_PASSWORD = "acp2026";
 
 // ============================================================
 // パスワード認証
 // ============================================================
-// セッション中は認証済みを保持（リロードしなければ再入力不要）
 if (sessionStorage.getItem("auth") === "1") {
   document.getElementById("authScreen").style.display = "none";
-  document.getElementById("mainScreen").style.display = "block";
+  var ms = document.getElementById("mainScreen");
+  ms.style.display = "flex";
   updateStats();
 }
 
@@ -151,7 +184,8 @@ function checkPw() {
   if (input === SCANNER_PASSWORD) {
     sessionStorage.setItem("auth", "1");
     document.getElementById("authScreen").style.display = "none";
-    document.getElementById("mainScreen").style.display = "block";
+    var ms = document.getElementById("mainScreen");
+    ms.style.display = "flex";
     updateStats();
   } else {
     var err = document.getElementById("pwErr");
@@ -299,7 +333,6 @@ function updateStats() {
   );
 }
 
-// 30秒ごとに自動更新
 setInterval(function() {
   if (sessionStorage.getItem("auth") === "1") updateStats();
 }, 30000);
