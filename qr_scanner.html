@@ -206,9 +206,11 @@ window.addEventListener("load", function() {
 var video    = document.getElementById("video");
 var result   = document.getElementById("result");
 var countEl  = document.getElementById("count");
-var scanning = false;
-var lastId   = "";
-var lastScan = 0;
+var scanning    = false;
+var lastId      = "";
+var lastScan    = 0;
+var confirmId   = "";   // 二重確認用：直前に読んだID
+var confirmCount = 0;   // 同じIDを連続で読んだ回数
 
 function startCamera() {
   var btn = document.getElementById("startBtn");
@@ -236,8 +238,8 @@ function startScan() {
   var canvas = document.createElement("canvas");
   var ctx    = canvas.getContext("2d");
 
-  // 100ms間隔（1秒10回）でスキャン → 発熱・バッテリー消費を抑える
-  // QRコードは静止しているので10回/秒で十分読み取れる
+  // 150ms間隔（1秒約7回）でスキャン
+  // 同じIDを連続2回読み取れた場合のみチェックイン（誤読み取り防止）
   setInterval(function() {
     if (!scanning) return;
     if (video.readyState !== video.HAVE_ENOUGH_DATA) return;
@@ -246,17 +248,40 @@ function startScan() {
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
     var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    var code    = jsQR(imgData.data, imgData.width, imgData.height, {
-      inversionAttempts: "dontInvert"
+
+    // attemptBothとdontInvertの両方を試して読み取り精度を上げる
+    var code = jsQR(imgData.data, imgData.width, imgData.height, {
+      inversionAttempts: "attemptBoth"
     });
-    var now = Date.now();
-    if (code && code.data !== lastId && (now - lastScan) > 2000) {
-      lastId   = code.data;
-      lastScan = now;
-      scanning = false;
-      doCheckIn(code.data);
+
+    if (!code) {
+      // 読み取れなかった場合はカウントをリセット
+      confirmCount = 0;
+      return;
     }
-  }, 100);
+
+    var now = Date.now();
+    // 前回チェックインから2秒以内は無視
+    if (now - lastScan < 2000) return;
+
+    if (code.data === confirmId) {
+      // 同じIDが連続して読み取れた
+      confirmCount++;
+      if (confirmCount >= 2) {
+        // 2回連続で同じIDを読み取れたらチェックイン
+        lastId       = code.data;
+        lastScan     = now;
+        confirmId    = "";
+        confirmCount = 0;
+        scanning     = false;
+        doCheckIn(code.data);
+      }
+    } else {
+      // 違うIDが読み取れたらカウントをリセット
+      confirmId    = code.data;
+      confirmCount = 1;
+    }
+  }, 150);
 }
 
 // JSONP（CORSを回避）
